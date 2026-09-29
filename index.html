@@ -3,201 +3,324 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>배틀로열 RPG</title>
+    <title>멀티플레이 배틀로얄 TRPG: 최후의 1인</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        @keyframes pulse-red {
-            0%, 100% { background-color: rgba(153, 27, 27, 0.4); }
-            50% { background-color: rgba(153, 27, 27, 0.8); }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
         }
-        .pulse-danger { animation: pulse-red 2s infinite; }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        .pulse-danger {
+            animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; border-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+            50% { opacity: 0.6; border-color: #7f1d1d; box-shadow: 0 0 5px rgba(127, 29, 29, 0.2); }
+        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between">
+<body class="bg-slate-950 min-h-screen text-slate-100 flex flex-col justify-between select-none">
 
-    <!-- 상단 헤더 & 상태바 -->
-    <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-40">
-        <div class="max-w-4xl mx-auto flex items-center justify-between">
-            <h1 class="text-xl font-extrabold text-amber-500 flex items-center gap-2">
-                <i class="fa-solid fa-skull"></i> BATTLE ROYALE RPG
-            </h1>
-            <div id="game-status-bar" class="hidden flex items-center gap-4 text-xs">
-                <span class="bg-slate-800 px-3 py-1 rounded-lg border border-slate-700">
-                    방 코드: <strong id="display-room-code" class="text-amber-400">-----</strong>
-                </span>
-                <span class="bg-slate-800 px-3 py-1 rounded-lg border border-slate-700">
-                    라운드: <strong id="stat-turn" class="text-cyan-400">1</strong>
-                </span>
-                <span class="bg-slate-800 px-3 py-1 rounded-lg border border-slate-700">
-                    생존자: <strong id="stat-survivors" class="text-emerald-400">0</strong>명
-                </span>
+    <!-- Top Header Navigation -->
+    <header class="bg-slate-900/90 border-b border-slate-800 px-4 py-3 sticky top-0 z-40 backdrop-blur flex justify-between items-center">
+        <div class="max-w-7xl mx-auto w-full flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-radio text-red-500 text-2xl animate-pulse"></i>
+                <div>
+                    <h1 class="font-extrabold text-lg sm:text-xl tracking-wider text-slate-100 uppercase flex items-center gap-2">
+                        LAST SURVIVOR <span class="text-xs text-red-400 bg-red-950 px-2 py-0.5 rounded border border-red-800 font-bold">TRPG</span>
+                    </h1>
+                </div>
+            </div>
+            <div id="game-status-bar" class="hidden flex items-center space-x-4 sm:space-x-6 text-xs sm:text-sm">
+                <div class="flex items-center space-x-1.5">
+                    <i class="fa-solid fa-door-closed text-purple-400"></i>
+                    <span class="text-slate-400 hidden sm:inline">방 코드:</span>
+                    <span id="display-room-code" class="font-bold text-purple-400 uppercase tracking-widest text-sm">----</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <i class="fa-solid fa-users text-amber-400"></i>
+                    <span class="text-slate-400 hidden sm:inline">생존자:</span>
+                    <span id="stat-survivors" class="font-bold text-amber-400 text-sm">0</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <i class="fa-solid fa-clock text-cyan-400"></i>
+                    <span class="text-slate-400 hidden sm:inline">라운드:</span>
+                    <span id="stat-turn" class="font-bold text-cyan-400 text-sm">1</span>
+                </div>
             </div>
         </div>
     </header>
 
-    <!-- 메인 컨테이너 -->
-    <main class="max-w-4xl mx-auto w-full p-4 flex-grow">
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto w-full p-4 flex-1 flex flex-col justify-center">
 
-        <!-- 대기실 화면 -->
-        <div id="screen-room-waiting" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-6">
-            <h2 class="text-lg font-bold mb-4 text-slate-200 border-b border-slate-800 pb-2">대기실 참가자 목록</h2>
-            <div id="waiting-player-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6"></div>
-            
-            <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-                <p id="waiting-status-msg" class="text-xs text-amber-400 animate-pulse">방장이 게임을 시작하기를 기다리는 중...</p>
-                <button id="btn-host-start" onclick="hostStartGame()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition">
-                    게임 시작
+        <!-- 1. MULTIPLAYER LOBBY SCREEN -->
+        <section id="screen-lobby" class="max-w-md mx-auto w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-red-950/60 border border-red-800 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-red-950/50">
+                    <i class="fa-solid fa-skull text-3xl text-red-500"></i>
+                </div>
+                <h2 class="text-xl font-bold text-slate-100">최후의 1인 : TRPG 배틀로얄</h2>
+                <p class="text-xs text-slate-400 mt-1">이름을 입력하고 방에 참가하거나 싱글 플레이를 시작하세요.</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">생존자 닉네임</label>
+                    <input type="text" id="input-nickname" placeholder="닉네임 입력" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-red-500 transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">방 코드 (선택)</label>
+                    <input type="text" id="input-room-code" placeholder="예: ROOM123" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 uppercase tracking-widest focus:outline-none focus:border-red-500 transition">
+                </div>
+            </div>
+
+            <div class="space-y-2 pt-2">
+                <button onclick="handleCreateOrJoinRoom(false)" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl transition text-sm shadow-lg shadow-red-950/50 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> 멀티플레이 방 입장 / 생성
                 </button>
-                <button onclick="leaveRoom()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2 rounded-xl text-xs transition">
-                    나가기
+                <button onclick="startSinglePlayerMode()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-xl transition text-sm border border-slate-700 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-robot text-cyan-400"></i> 싱글 / AI 오프라인 테스트
                 </button>
             </div>
-        </div>
+        </section>
 
-        <!-- 게임플레이 메인 화면 -->
-        <div id="screen-gameplay" class="hidden space-y-6">
-            <!-- 내 상태 및 조작 패널 -->
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-800">
+        <!-- 2. ROOM WAITING LOBBY SCREEN -->
+        <section id="screen-room-waiting" class="hidden max-w-lg mx-auto w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-100">대기실 참가자 목록</h2>
+                    <p class="text-xs text-slate-400">모든 생존자가 준비되면 게임을 시작합니다.</p>
+                </div>
+                <span id="waiting-room-code-badge" class="bg-purple-950 border border-purple-800 text-purple-300 font-bold text-xs px-3 py-1 rounded-full uppercase tracking-wider">ROOM123</span>
+            </div>
+
+            <!-- Player List Container -->
+            <div id="waiting-player-list" class="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                <!-- Players dynamically injected here -->
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+                <button onclick="leaveRoom()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-left"></i> 나가기
+                </button>
+                <button id="btn-host-start" onclick="hostStartGame()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-950/50 flex items-center gap-2">
+                    <i class="fa-solid fa-play"></i> 게임 시작
+                </button>
+                <div id="waiting-status-msg" class="text-xs text-amber-400 font-semibold animate-pulse flex items-center gap-2">
+                    <i class="fa-solid fa-spinner animate-spin"></i> 방장이 게임을 시작하기를 기다리는 중...
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. GAMEPLAY SCREEN -->
+        <section id="screen-gameplay" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Left Column: Player Stats & Status -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5 flex flex-col justify-between">
                     <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span id="player-display-name" class="font-bold text-lg text-slate-100">플레이어</span>
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <div>
+                                <h3 id="player-display-name" class="font-extrabold text-base text-slate-100">플레이어</h3>
+                                <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                    <i class="fa-solid fa-location-dot text-red-400"></i> <span id="player-location-name">중앙 광장</span>
+                                </p>
+                            </div>
                             <span id="player-status-badge" class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2.5 py-0.5 rounded-full font-bold">생존</span>
                         </div>
-                        <p class="text-xs text-slate-400">현재 위치: <span id="player-location-name" class="text-cyan-400 font-semibold">알 수 없음</span></p>
-                    </div>
 
-                    <!-- HP 체력바 -->
-                    <div class="w-full sm:w-48">
-                        <div class="flex justify-between text-xs mb-1 font-semibold">
-                            <span class="text-slate-400">HP</span>
-                            <span id="hp-text" class="text-slate-200">100 / 100</span>
+                        <!-- Health Bar -->
+                        <div class="mt-4 space-y-1.5">
+                            <div class="flex justify-between text-xs font-bold">
+                                <span class="text-slate-400">체력 (HP)</span>
+                                <span id="hp-text" class="text-red-400">100 / 100</span>
+                            </div>
+                            <div class="w-full bg-slate-950 rounded-full h-3 overflow-hidden border border-slate-800 p-0.5">
+                                <div id="hp-bar" class="bg-gradient-to-r from-red-600 to-emerald-500 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+                            </div>
                         </div>
-                        <div class="w-full bg-slate-950 rounded-full h-2.5 border border-slate-800 overflow-hidden">
-                            <div id="hp-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" style="width: 100%;"></div>
+
+                        <!-- Stats Grid -->
+                        <div class="grid grid-cols-4 gap-2 mt-4 text-center">
+                            <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
+                                <div class="text-[10px] text-slate-500 font-semibold">근력</div>
+                                <div id="p-str" class="text-xs font-bold text-amber-400 mt-0.5">10</div>
+                            </div>
+                            <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
+                                <div class="text-[10px] text-slate-500 font-semibold">민첩</div>
+                                <div id="p-dex" class="text-xs font-bold text-cyan-400 mt-0.5">10</div>
+                            </div>
+                            <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
+                                <div class="text-[10px] text-slate-500 font-semibold">지능</div>
+                                <div id="p-int" class="text-xs font-bold text-purple-400 mt-0.5">10</div>
+                            </div>
+                            <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
+                                <div class="text-[10px] text-slate-500 font-semibold">운</div>
+                                <div id="p-luck" class="text-xs font-bold text-emerald-400 mt-0.5">10</div>
+                            </div>
+                        </div>
+
+                        <!-- Equipped Items -->
+                        <div class="mt-4 space-y-2 text-xs">
+                            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                                <span class="text-slate-400 flex items-center gap-1.5"><i class="fa-solid fa-gavel text-amber-500"></i> 주 무기</span>
+                                <span id="equip-weapon" class="font-bold text-amber-300">맨손</span>
+                            </div>
+                            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center">
+                                <span class="text-slate-400 flex items-center gap-1.5"><i class="fa-solid fa-shield text-cyan-500"></i> 방어구</span>
+                                <span id="equip-armor" class="font-bold text-cyan-300">일반 의류</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Phase Selectors -->
+                    <div class="space-y-2 pt-3 border-t border-slate-800">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-300">이번 라운드 행동 선택</span>
+                            <span id="action-lock-status" class="text-[10px] text-amber-400 font-semibold">선택 대기중</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="selectTurnAction('scavenge')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 border border-slate-700 p-2.5 rounded-xl text-xs font-bold text-cyan-300 flex flex-col items-center gap-1 transition">
+                                <i class="fa-solid fa-magnifying-glass text-sm"></i> 수색
+                            </button>
+                            <button onclick="selectTurnAction('rest')" class="bg-slate-800 hover:bg-slate-700 active:bg-emerald-900 border border-slate-700 p-2.5 rounded-xl text-xs font-bold text-emerald-300 flex flex-col items-center gap-1 transition">
+                                <i class="fa-solid fa-heart-pulse text-sm"></i> 휴식
+                            </button>
+                            <button onclick="selectTurnAction('attack')" class="bg-slate-800 hover:bg-slate-700 active:bg-red-900 border border-slate-700 p-2.5 rounded-xl text-xs font-bold text-red-300 flex flex-col items-center gap-1 transition">
+                                <i class="fa-solid fa-crosshairs text-sm"></i> 공격
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <button onclick="openInventoryModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 py-2 px-3 rounded-xl text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition">
+                                <i class="fa-solid fa-briefcase text-amber-400"></i> 소지품
+                            </button>
+                            <button onclick="openCraftingModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 py-2 px-3 rounded-xl text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition">
+                                <i class="fa-solid fa-hammer text-purple-400"></i> 아이템 제작
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- 능력치 & 장비 요약 -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-4">
-                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800/80">
-                        <span class="text-slate-500 block">무기</span>
-                        <span id="equip-weapon" class="font-bold text-amber-400 truncate block">맨손</span>
+                <!-- Center & Right: Map Grid & Live Logs -->
+                <div class="lg:col-span-2 space-y-6 flex flex-col justify-between">
+                    
+                    <!-- Map Zones Grid -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-extrabold text-sm text-slate-100 flex items-center gap-2">
+                                <i class="fa-solid fa-map-location-dot text-cyan-400"></i> 생존 구역 지도
+                            </h3>
+                            <span class="text-[10px] text-slate-400">구역 카드를 클릭하여 이동</span>
+                        </div>
+                        <div id="map-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <!-- Dynamically generated map zone cards -->
+                        </div>
                     </div>
-                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800/80">
-                        <span class="text-slate-500 block">방어구</span>
-                        <span id="equip-armor" class="font-bold text-cyan-400 truncate block">일반 의류</span>
-                    </div>
-                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800/80">
-                        <span class="text-slate-500 block">능력치 (STR/DEX)</span>
-                        <span class="font-bold text-slate-300"><span id="p-str">10</span> / <span id="p-dex">10</span></span>
-                    </div>
-                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800/80">
-                        <span class="text-slate-500 block">능력치 (INT/LUCK)</span>
-                        <span class="font-bold text-slate-300"><span id="p-int">10</span> / <span id="p-luck">10</span></span>
-                    </div>
-                </div>
 
-                <!-- 행동 선택 패널 -->
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    <div class="flex justify-between items-center mb-3">
-                        <span class="text-xs font-bold text-slate-300">라운드 행동 선택</span>
-                        <span id="action-lock-status" class="text-[10px] text-amber-400 font-semibold">행동 선택 대기중</span>
+                    <!-- Realtime Action Event Logs -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 flex-1 flex flex-col justify-between min-h-[220px]">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <h3 class="font-extrabold text-sm text-slate-100 flex items-center gap-2">
+                                <i class="fa-solid fa-scroll text-amber-400"></i> 전장 기록 (로그)
+                            </h3>
+                            <span class="text-[10px] text-slate-500">실시간 매칭 상태</span>
+                        </div>
+                        <div id="event-log-container" class="font-mono text-xs text-slate-300 space-y-1 overflow-y-auto max-h-48 pr-2 flex-1">
+                            <!-- Dynamic log messages -->
+                        </div>
                     </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button onclick="selectTurnAction('scavenge')" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 p-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1.5 transition">
-                            <i class="fa-solid fa-magnifying-glass text-cyan-400 text-base"></i> 탐색하기
-                        </button>
-                        <button onclick="selectTurnAction('rest')" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 p-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1.5 transition">
-                            <i class="fa-solid fa-bed text-emerald-400 text-base"></i> 휴식하기
-                        </button>
-                        <button onclick="selectTurnAction('attack')" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 p-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1.5 transition">
-                            <i class="fa-solid fa-swords text-red-400 text-base"></i> 교전하기
-                        </button>
-                    </div>
-                </div>
 
-                <!-- 서브 메뉴 버튼 -->
-                <div class="flex gap-2 mt-4">
-                    <button onclick="openInventoryModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-xs font-bold py-2.5 rounded-xl border border-slate-700 transition">
-                        <i class="fa-solid fa-box-open mr-1 text-amber-400"></i> 인벤토리
-                    </button>
-                    <button onclick="openCraftingModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-xs font-bold py-2.5 rounded-xl border border-slate-700 transition">
-                        <i class="fa-solid fa-hammer mr-1 text-cyan-400"></i> 아이템 제작
-                    </button>
                 </div>
             </div>
+        </section>
 
-            <!-- 지도 현황 -->
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
-                <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-map"></i> 구역 지도
-                </h3>
-                <div id="map-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
-            </div>
-
-            <!-- 로그 기록 -->
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
-                <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-scroll"></i> 전투 상황 기록
-                </h3>
-                <div id="event-log-container" class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 h-48 overflow-y-auto font-mono text-xs text-slate-400 leading-relaxed space-y-1"></div>
-            </div>
-        </div>
     </main>
 
-    <!-- 인벤토리 모달 -->
-    <div id="modal-inventory" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl">
-            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
-                <h3 class="font-bold text-slate-200 flex items-center gap-2">
-                    <i class="fa-solid fa-box-open text-amber-400"></i> 인벤토리
+    <!-- Modal: Inventory -->
+    <div id="modal-inventory" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-briefcase text-amber-400"></i> 인벤토리 및 장비
                 </h3>
-                <button onclick="closeModal('modal-inventory')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('modal-inventory')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
-            <div class="space-y-4">
-                <div>
-                    <h4 class="text-xs font-bold text-slate-400 mb-2">장착 중인 장비</h4>
-                    <div id="inventory-equipped-list" class="space-y-1.5"></div>
-                </div>
-                <div>
-                    <h4 class="text-xs font-bold text-slate-400 mb-2">소지 아이템</h4>
-                    <div id="inventory-items-list" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
+            <div id="inventory-equipped-list" class="space-y-2">
+                <!-- Equipped items details -->
+            </div>
+            <div class="border-t border-slate-800 pt-3">
+                <h4 class="text-xs font-bold text-slate-400 mb-2">보유 아이템</h4>
+                <div id="inventory-items-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <!-- Inventory items -->
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 제작 모달 -->
-    <div id="modal-crafting" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl">
-            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
-                <h3 class="font-bold text-slate-200 flex items-center gap-2">
-                    <i class="fa-solid fa-hammer text-cyan-400"></i> 아이템 제작
+    <!-- Modal: Crafting -->
+    <div id="modal-crafting" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-hammer text-purple-400"></i> 생존 아이템 제작
                 </h3>
-                <button onclick="closeModal('modal-crafting')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeModal('modal-crafting')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
-            <div class="space-y-4">
-                <div>
-                    <h4 class="text-xs font-bold text-slate-400 mb-1.5">보유 재료</h4>
-                    <div id="crafting-materials-summary" class="flex flex-wrap gap-1.5 text-xs"></div>
+            <div>
+                <h4 class="text-xs font-bold text-slate-400 mb-1.5">보유 재료</h4>
+                <div id="crafting-materials-summary" class="flex flex-wrap gap-1.5 min-h-[28px]">
+                    <!-- Crafting materials badges -->
                 </div>
-                <div>
-                    <h4 class="text-xs font-bold text-slate-400 mb-2">제작 가능 레시피</h4>
-                    <div id="crafting-recipes-list" class="space-y-2 max-h-56 overflow-y-auto pr-1"></div>
+            </div>
+            <div class="border-t border-slate-800 pt-3">
+                <h4 class="text-xs font-bold text-slate-400 mb-2">제작 레시피 목록</h4>
+                <div id="crafting-recipes-list" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    <!-- Recipes -->
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Firebase 및 메인 게임 로직 Script -->
+    <!-- Custom Alert / Toast Modal -->
+    <div id="modal-alert" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xs w-full p-5 text-center space-y-4 shadow-2xl">
+            <div class="w-12 h-12 bg-amber-950/80 border border-amber-700 rounded-full flex items-center justify-center mx-auto text-amber-400 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <p id="alert-message-text" class="text-xs sm:text-sm text-slate-200 font-medium">경고 메시지입니다.</p>
+            <button onclick="closeModal('modal-alert')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2 rounded-xl transition">
+                확인
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase and Main Game Script -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // Firebase 설정 (실제 환경 데이터 입력 필요)
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_AUTH_DOMAIN",
@@ -208,27 +331,38 @@
             appId: "YOUR_APP_ID"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        let db = null;
+        let isOfflineMode = false;
 
-        // 구역 데이터
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.databaseURL !== "YOUR_DATABASE_URL") {
+                const app = initializeApp(firebaseConfig);
+                db = getDatabase(app);
+            } else {
+                console.warn("Firebase 설정이 연결되지 않았으므로 오프라인/테스트 모드로 전환됩니다.");
+                isOfflineMode = true;
+            }
+        } catch (err) {
+            console.error("Firebase 초기화 오류:", err);
+            isOfflineMode = true;
+        }
+
         const ZONES = [
             { id: 0, name: "중앙 광장", desc: "물자가 다수 존재하지만 위험한 지역입니다.", icon: "fa-monument", specialItem: "ITEM_MEDKIT" },
-            { id: 1, name: "폐허가 된 연구소", desc: "고성능 부품과 무기를 얻을 수 있습니다.", icon: "fa-flask", specialItem: "ITEM_PARTS" },
+            { id: 1, name: "폐허 연구소", desc: "고성능 파츠와 장비를 얻을 수 있습니다.", icon: "fa-flask", specialItem: "ITEM_PARTS" },
             { id: 2, name: "버려진 주택가", desc: "기본적인 생존 물자를 수집하기 좋습니다.", icon: "fa-house", specialItem: "ITEM_BANDAGE" },
             { id: 3, name: "군사 기지", desc: "강력한 군용 무기가 숨겨져 있습니다.", icon: "fa-shield-halved", specialItem: "ITEM_COMBAT_KNIFE" },
             { id: 4, name: "음침한 숲", desc: "몸을 숨기기 쉽고 자연 재료가 풍부합니다.", icon: "fa-tree", specialItem: "ITEM_HARD_WOOD" },
             { id: 5, name: "항구 창고", desc: "철재와 금속 부품을 찾을 수 있습니다.", icon: "fa-warehouse", specialItem: "ITEM_SCRAP_IRON" }
         ];
 
-        // 최적화된 아이템 데이터베이스 (아이템 코드 사용, 무기 내구도 5 기본 제공)
         const ITEMS_DATABASE = {
-            "ITEM_MEDKIT": { code: "ITEM_MEDKIT", name: "구급상자", type: "consumable", effect: "heal", value: 50, maxStackSize: 10, desc: "HP를 50 회복합니다." },
-            "ITEM_BANDAGE": { code: "ITEM_BANDAGE", name: "붕대", type: "consumable", effect: "heal", value: 20, maxStackSize: 20, desc: "HP를 20 회복합니다." },
-            "ITEM_COMBAT_KNIFE": { code: "ITEM_COMBAT_KNIFE", name: "군용 칼", type: "weapon", atk: 15, maxDurability: 5, maxStackSize: 5, desc: "공격력을 상승시킵니다. (+15, 내구도: 5)" },
-            "ITEM_PARTS": { code: "ITEM_PARTS", name: "고성능 파츠", type: "material", maxStackSize: 99, desc: "제작 재료" },
-            "ITEM_HARD_WOOD": { code: "ITEM_HARD_WOOD", name: "단단한 목재", type: "material", maxStackSize: 99, desc: "제작 재료" },
-            "ITEM_SCRAP_IRON": { code: "ITEM_SCRAP_IRON", name: "고철 조각", type: "material", maxStackSize: 99, desc: "제작 재료" }
+            "ITEM_MEDKIT": { code: "ITEM_MEDKIT", name: "구급상자", type: "consumable", effect: "heal", value: 50, desc: "HP를 50 회복합니다." },
+            "ITEM_BANDAGE": { code: "ITEM_BANDAGE", name: "붕대", type: "consumable", effect: "heal", value: 20, desc: "HP를 20 회복합니다." },
+            "ITEM_COMBAT_KNIFE": { code: "ITEM_COMBAT_KNIFE", name: "군용 칼", type: "weapon", atk: 15, maxDurability: 5, desc: "공격력을 상승시킵니다. (+15, 내구도 5)" },
+            "ITEM_PARTS": { code: "ITEM_PARTS", name: "고성능 파츠", type: "material", desc: "고급 제작 재료" },
+            "ITEM_HARD_WOOD": { code: "ITEM_HARD_WOOD", name: "단단한 목재", type: "material", desc: "제작 재료" },
+            "ITEM_SCRAP_IRON": { code: "ITEM_SCRAP_IRON", name: "고철 조각", type: "material", desc: "제작 재료" }
         };
 
         const RECIPES = [
@@ -236,45 +370,132 @@
             { id: "RECIPE_MEDKIT", name: "응급 키트", result: "ITEM_MEDKIT", req: { "ITEM_BANDAGE": 2 }, desc: "HP 50 회복 아이템" }
         ];
 
-        // 전역 플레이어 세션 상태
-        let roomCode = "ROOM123"; 
-        let localPlayerId = "player_" + Math.random().toString(36).substring(2, 9);
-        let isHost = false;
+        let roomCode = "ROOM123";
+        let localPlayerId = "player_" + Math.random().toString(36).substring(2, 8);
+        let isHost = true;
 
         let player = {
             id: localPlayerId,
-            name: "플레이어_" + localPlayerId.substring(7),
+            name: "생존자",
             hp: 100,
             maxHp: 100,
             location: 0,
             isAlive: true,
-            equippedWeapon: null, // { itemCode: "ITEM_COMBAT_KNIFE", currentDurability: 5 }
+            equippedWeapon: null,
             equippedArmor: null,
-            inventory: { items: {} }, // { "ITEM_MEDKIT": 2, "ITEM_COMBAT_KNIFE": 1 }
+            inventory: { items: { "ITEM_BANDAGE": 2 } },
             selectedAction: null
         };
 
         let stats = { str: 10, dex: 10, int: 10, luck: 10 };
 
-        const getRoomRef = () => ref(db, `rooms/${roomCode}`);
-
-        async function initGame() {
-            const joined = await joinRoomInFirestore();
-            if (!joined) {
-                await createRoomInFirestore();
-                isHost = true;
+        let localRoomState = {
+            roomCode: roomCode,
+            status: "waiting",
+            turn: 1,
+            restrictedZones: [],
+            logs: [`전장에 개설되었습니다. (로컬/싱글 모드)`],
+            players: {
+                [localPlayerId]: {
+                    ...player,
+                    stats: stats,
+                    isHost: true
+                },
+                "bot_1": {
+                    id: "bot_1",
+                    name: "AI_생존자1",
+                    hp: 100,
+                    maxHp: 100,
+                    location: 1,
+                    isAlive: true,
+                    equippedWeapon: null,
+                    equippedArmor: null,
+                    inventory: { items: {} },
+                    stats: { str: 8, dex: 8, int: 8, luck: 8 },
+                    isHost: false
+                },
+                "bot_2": {
+                    id: "bot_2",
+                    name: "AI_생존자2",
+                    hp: 100,
+                    maxHp: 100,
+                    location: 2,
+                    isAlive: true,
+                    equippedWeapon: null,
+                    equippedArmor: null,
+                    inventory: { items: {} },
+                    stats: { str: 9, dex: 9, int: 9, luck: 9 },
+                    isHost: false
+                }
             }
-            listenToRoomUpdates();
-        }
+        };
+
+        const getRoomRef = () => (db ? ref(db, `rooms/${roomCode}`) : null);
+
+        window.showAlert = function(msg) {
+            const msgEl = document.getElementById("alert-message-text");
+            const modalEl = document.getElementById("modal-alert");
+            if (msgEl && modalEl) {
+                msgEl.textContent = msg;
+                modalEl.classList.remove("hidden");
+            }
+        };
+
+        window.handleCreateOrJoinRoom = async function(isSinglePlayer = false) {
+            const nickInput = document.getElementById("input-nickname")?.value.trim();
+            const roomInput = document.getElementById("input-room-code")?.value.trim();
+
+            if (nickInput) {
+                player.name = nickInput;
+                if (localRoomState.players[localPlayerId]) {
+                    localRoomState.players[localPlayerId].name = nickInput;
+                }
+            }
+
+            if (roomInput) {
+                roomCode = roomInput.toUpperCase();
+                localRoomState.roomCode = roomCode;
+            }
+
+            document.getElementById("screen-lobby")?.classList.add("hidden");
+            document.getElementById("screen-room-waiting")?.classList.remove("hidden");
+
+            const badge = document.getElementById("waiting-room-code-badge");
+            if (badge) badge.textContent = roomCode;
+
+            if (isOfflineMode || !db) {
+                renderWaitingRoom(localRoomState);
+                return;
+            }
+
+            try {
+                const joined = await joinRoomInFirestore();
+                if (!joined) {
+                    await createRoomInFirestore();
+                    isHost = true;
+                }
+                listenToRoomUpdates();
+            } catch (err) {
+                console.error("Firebase 연결 실패, 오프라인 모드로 전환합니다.", err);
+                isOfflineMode = true;
+                renderWaitingRoom(localRoomState);
+            }
+        };
+
+        window.startSinglePlayerMode = function() {
+            isOfflineMode = true;
+            window.handleCreateOrJoinRoom(true);
+        };
 
         async function createRoomInFirestore() {
+            if (isOfflineMode || !db) return;
             const roomRef = getRoomRef();
             const initialRoomData = {
                 roomCode: roomCode,
                 status: "waiting",
                 turn: 1,
                 restrictedZones: [],
-                logs: [`방 [${roomCode}]이(가) 개설되었습니다.`],
+                logs: [`방 [${roomCode}]이(가) 생겼습니다.`],
                 players: {
                     [localPlayerId]: {
                         ...player,
@@ -287,6 +508,7 @@
         }
 
         async function joinRoomInFirestore() {
+            if (isOfflineMode || !db) return false;
             const roomRef = getRoomRef();
             const snapshot = await get(roomRef);
 
@@ -294,7 +516,7 @@
 
             const roomData = snapshot.val();
             if (roomData.status !== "waiting") {
-                alert("이미 진행 중이거나 종료된 방입니다.");
+                window.showAlert("이미 진행 중인 게임입니다.");
                 return false;
             }
 
@@ -309,6 +531,7 @@
         }
 
         function listenToRoomUpdates() {
+            if (isOfflineMode || !db) return;
             const roomRef = getRoomRef();
             onValue(roomRef, (snapshot) => {
                 if (!snapshot.exists()) return;
@@ -318,15 +541,17 @@
                 renderGameplayUI(roomData);
 
                 if (roomData.status === "playing") {
-                    document.getElementById("screen-room-waiting").classList.add("hidden");
-                    document.getElementById("screen-gameplay").classList.remove("hidden");
-                    document.getElementById("game-status-bar").classList.remove("hidden");
+                    document.getElementById("screen-room-waiting")?.classList.add("hidden");
+                    document.getElementById("screen-gameplay")?.classList.remove("hidden");
+                    document.getElementById("game-status-bar")?.classList.remove("hidden");
                 }
             });
         }
 
         function renderWaitingRoom(roomData) {
             const playerListEl = document.getElementById("waiting-player-list");
+            if (!playerListEl) return;
+
             playerListEl.innerHTML = "";
 
             const players = roomData.players || {};
@@ -348,16 +573,26 @@
             const waitingMsg = document.getElementById("waiting-status-msg");
 
             if (isHost) {
-                hostStartBtn.classList.remove("hidden");
-                waitingMsg.classList.add("hidden");
+                hostStartBtn?.classList.remove("hidden");
+                waitingMsg?.classList.add("hidden");
             } else {
-                hostStartBtn.classList.add("hidden");
-                waitingMsg.classList.remove("hidden");
+                hostStartBtn?.classList.add("hidden");
+                waitingMsg?.classList.remove("hidden");
             }
         }
 
         window.hostStartGame = async function() {
             if (!isHost) return;
+
+            if (isOfflineMode || !db) {
+                localRoomState.status = "playing";
+                document.getElementById("screen-room-waiting")?.classList.add("hidden");
+                document.getElementById("screen-gameplay")?.classList.remove("hidden");
+                document.getElementById("game-status-bar")?.classList.remove("hidden");
+                renderGameplayUI(localRoomState);
+                return;
+            }
+
             const roomRef = getRoomRef();
             await update(roomRef, { status: "playing" });
         };
@@ -372,54 +607,69 @@
 
             if (me) {
                 player = me;
-                document.getElementById("player-display-name").textContent = me.name;
-                document.getElementById("player-location-name").textContent = ZONES[me.location]?.name || "알 수 없음";
-                document.getElementById("hp-text").textContent = `${me.hp} / ${me.maxHp}`;
-                
-                const hpPercent = Math.max(0, Math.min(100, (me.hp / me.maxHp) * 100));
-                document.getElementById("hp-bar").style.width = `${hpPercent}%`;
+                const nameEl = document.getElementById("player-display-name");
+                if (nameEl) nameEl.textContent = me.name;
 
-                // 무기 및 내구도 표기
-                if (me.equippedWeapon) {
-                    const wData = ITEMS_DATABASE[me.equippedWeapon.itemCode];
-                    document.getElementById("equip-weapon").textContent = `${wData?.name || "무기"} (${me.equippedWeapon.currentDurability}/${wData?.maxDurability || 5})`;
-                } else {
-                    document.getElementById("equip-weapon").textContent = "맨손";
+                const locEl = document.getElementById("player-location-name");
+                if (locEl) locEl.textContent = ZONES[me.location]?.name || "알 수 없음";
+
+                const hpTextEl = document.getElementById("hp-text");
+                if (hpTextEl) hpTextEl.textContent = `${me.hp} / ${me.maxHp}`;
+                
+                const hpBarEl = document.getElementById("hp-bar");
+                if (hpBarEl) {
+                    const hpPercent = Math.max(0, Math.min(100, (me.hp / me.maxHp) * 100));
+                    hpBarEl.style.width = `${hpPercent}%`;
                 }
 
-                document.getElementById("equip-armor").textContent = me.equippedArmor || "일반 의류";
+                const wEl = document.getElementById("equip-weapon");
+                if (wEl) {
+                    if (me.equippedWeapon) {
+                        const wData = ITEMS_DATABASE[me.equippedWeapon.itemCode];
+                        wEl.textContent = `${wData?.name || "무기"} (${me.equippedWeapon.currentDurability}/${wData?.maxDurability || 5})`;
+                    } else {
+                        wEl.textContent = "맨손";
+                    }
+                }
+
+                const armEl = document.getElementById("equip-armor");
+                if (armEl) armEl.textContent = me.equippedArmor || "일반 의류";
 
                 if (me.stats) {
-                    document.getElementById("p-str").textContent = me.stats.str;
-                    document.getElementById("p-dex").textContent = me.stats.dex;
-                    document.getElementById("p-int").textContent = me.stats.int;
-                    document.getElementById("p-luck").textContent = me.stats.luck;
+                    if (document.getElementById("p-str")) document.getElementById("p-str").textContent = me.stats.str;
+                    if (document.getElementById("p-dex")) document.getElementById("p-dex").textContent = me.stats.dex;
+                    if (document.getElementById("p-int")) document.getElementById("p-int").textContent = me.stats.int;
+                    if (document.getElementById("p-luck")) document.getElementById("p-luck").textContent = me.stats.luck;
                 }
 
                 const statusBadge = document.getElementById("player-status-badge");
-                if (me.isAlive) {
-                    statusBadge.textContent = "생존";
-                    statusBadge.className = "text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2.5 py-0.5 rounded-full font-bold";
-                } else {
-                    statusBadge.textContent = "사망";
-                    statusBadge.className = "text-[10px] bg-red-950 text-red-500 border border-red-800 px-2.5 py-0.5 rounded-full font-bold animate-pulse";
+                if (statusBadge) {
+                    if (me.isAlive) {
+                        statusBadge.textContent = "생존";
+                        statusBadge.className = "text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2.5 py-0.5 rounded-full font-bold";
+                    } else {
+                        statusBadge.textContent = "사망";
+                        statusBadge.className = "text-[10px] bg-red-950 text-red-500 border border-red-800 px-2.5 py-0.5 rounded-full font-bold animate-pulse";
+                    }
                 }
 
                 const lockStatus = document.getElementById("action-lock-status");
-                if (me.selectedAction) {
-                    lockStatus.textContent = `선택 완료 (${me.selectedAction})`;
-                    lockStatus.className = "text-[10px] text-emerald-400 font-semibold";
-                } else {
-                    lockStatus.textContent = "행동 선택 대기중";
-                    lockStatus.className = "text-[10px] text-amber-400 font-semibold";
+                if (lockStatus) {
+                    if (me.selectedAction) {
+                        lockStatus.textContent = `선택 완료 (${me.selectedAction})`;
+                        lockStatus.className = "text-[10px] text-emerald-400 font-semibold";
+                    } else {
+                        lockStatus.textContent = "선택 대기중";
+                        lockStatus.className = "text-[10px] text-amber-400 font-semibold";
+                    }
                 }
             }
 
-            document.getElementById("display-room-code").textContent = roomCode;
-            document.getElementById("stat-turn").textContent = roomData.turn || 1;
+            if (document.getElementById("display-room-code")) document.getElementById("display-room-code").textContent = roomCode;
+            if (document.getElementById("stat-turn")) document.getElementById("stat-turn").textContent = roomData.turn || 1;
 
             const aliveCount = Object.values(players).filter(p => p.isAlive).length;
-            document.getElementById("stat-survivors").textContent = aliveCount;
+            if (document.getElementById("stat-survivors")) document.getElementById("stat-survivors").textContent = aliveCount;
 
             renderMap(roomData);
             renderLogs(roomData.logs || []);
@@ -427,6 +677,7 @@
 
         function renderMap(roomData) {
             const gridEl = document.getElementById("map-grid");
+            if (!gridEl) return;
             gridEl.innerHTML = "";
 
             const restricted = roomData.restrictedZones || [];
@@ -478,13 +729,35 @@
 
         async function moveZone(zoneId) {
             if (!player.isAlive) return;
+
+            if (isOfflineMode || !db) {
+                localRoomState.players[localPlayerId].location = zoneId;
+                renderGameplayUI(localRoomState);
+                return;
+            }
+
             const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
             await update(playerRef, { location: zoneId });
         }
 
         window.selectTurnAction = async function(actionType) {
             if (!player.isAlive) {
-                alert("사망한 상태에서는 행동할 수 없습니다.");
+                window.showAlert("사망한 상태에서는 행동할 수 없습니다.");
+                return;
+            }
+
+            if (isOfflineMode || !db) {
+                localRoomState.players[localPlayerId].selectedAction = actionType;
+                
+                Object.values(localRoomState.players).forEach(p => {
+                    if (p.id !== localPlayerId && p.isAlive) {
+                        const actions = ['scavenge', 'rest', 'attack'];
+                        p.selectedAction = actions[Math.floor(Math.random() * actions.length)];
+                    }
+                });
+
+                resolveTurnLogic(localRoomState);
+                renderGameplayUI(localRoomState);
                 return;
             }
 
@@ -495,7 +768,7 @@
         };
 
         async function checkAndResolveTurn() {
-            if (!isHost) return;
+            if (!isHost || isOfflineMode || !db) return;
 
             const roomRef = getRoomRef();
             const snapshot = await get(roomRef);
@@ -512,7 +785,6 @@
             }
         }
 
-        // 라운드 결과 로직 실행 (무기 내구도 차감 및 파괴 포함)
         async function resolveTurnLogic(roomData) {
             let players = roomData.players;
             let logs = roomData.logs || [];
@@ -547,13 +819,10 @@
                         let weaponAtk = 5;
                         let weaponName = "맨손";
 
-                        // 장착 중인 무기가 있는 경우 처리
                         if (p.equippedWeapon) {
                             const wData = ITEMS_DATABASE[p.equippedWeapon.itemCode];
                             weaponAtk = wData?.atk || 15;
                             weaponName = wData?.name || "무기";
-
-                            // 내구도 1 감소
                             p.equippedWeapon.currentDurability -= 1;
                         }
 
@@ -561,63 +830,63 @@
                         const dmg = weaponAtk + strBonus;
 
                         target.hp -= dmg;
-                        logs.push(`⚔️ [${p.name}]이(가) [${weaponName}]으로 [${target.name}]을(를) 공격하여 ${dmg} 데미지를 입혔습니다!`);
+                        logs.push(`⚔️ [${p.name}]이(가) [${weaponName}]으로 [${target.name}]에게 ${dmg} 데미지를 입혔습니다!`);
 
-                        // 무기 내구도 소진 체크 (5회 사용 후 파괴)
                         if (p.equippedWeapon && p.equippedWeapon.currentDurability <= 0) {
-                            logs.push(`💥 [${p.name}]의 [${weaponName}] 내구도가 0이 되어 파괴되었습니다!`);
-                            
-                            // 인벤토리 수량 차감 및 자동 교체
+                            logs.push(`💥 [${p.name}]의 [${weaponName}] 내구도가 다하여 파괴되었습니다!`);
                             const itemCode = p.equippedWeapon.itemCode;
                             if (p.inventory?.items[itemCode] > 0) {
                                 p.inventory.items[itemCode] -= 1;
-                                if (p.inventory.items[itemCode] <= 0) {
-                                    delete p.inventory.items[itemCode];
-                                }
+                                if (p.inventory.items[itemCode] <= 0) delete p.inventory.items[itemCode];
                             }
 
                             if (p.inventory?.items[itemCode] > 0) {
                                 p.equippedWeapon.currentDurability = ITEMS_DATABASE[itemCode].maxDurability || 5;
-                                logs.push(`🔄 [${p.name}]이(가) 소지품에서 새로운 [${weaponName}]을(를) 장착했습니다.`);
+                                logs.push(`🔄 [${p.name}]이(가) 새 무기를 자동 장착했습니다.`);
                             } else {
-                                p.equippedWeapon = null; // 남은 무기가 없으면 맨손 상태
+                                p.equippedWeapon = null;
                             }
                         }
 
                         if (target.hp <= 0) {
                             target.hp = 0;
                             target.isAlive = false;
-                            logs.push(`💀 [${target.name}]이(가) 치명상을 입고 탈락했습니다!`);
+                            logs.push(`💀 [${target.name}]이(가) 쓰러졌습니다!`);
                         }
                     } else {
-                        logs.push(`⚔️ [${p.name}]이(가) 공격을 시도했지만 같은 구역에 적이 없었습니다.`);
+                        logs.push(`⚔️ [${p.name}]이(가) 공격하려 했으나 구역에 적이 없었습니다.`);
                     }
                 }
 
                 p.selectedAction = null;
             });
 
-            // 금지 구역 갱신 로직
             if (currentTurn % 2 === 0 && restrictedZones.length < ZONES.length - 1) {
                 let available = ZONES.map(z => z.id).filter(id => !restrictedZones.includes(id));
                 if (available.length > 0) {
                     let newlyRestricted = available[Math.floor(Math.random() * available.length)];
                     restrictedZones.push(newlyRestricted);
-                    logs.push(`🚨 [경고] ${ZONES[newlyRestricted].name} 구역이 금지 구역으로 지정되었습니다!`);
+                    logs.push(`🚨 [경고] ${ZONES[newlyRestricted].name} 구역이 금지 구역이 되었습니다!`);
 
                     Object.keys(players).forEach((id) => {
                         let p = players[id];
                         if (p.isAlive && p.location === newlyRestricted) {
                             p.hp -= 40;
-                            logs.push(`⚠️ [${p.name}]이(가) 금지 구역에 잔류하여 40 데미지를 입었습니다!`);
+                            logs.push(`⚠️ [${p.name}]이(가) 금지 구역에서 40 데미지를 입었습니다!`);
                             if (p.hp <= 0) {
                                 p.hp = 0;
                                 p.isAlive = false;
-                                logs.push(`💀 [${p.name}]이(가) 금지 구역 자기장에 사살되었습니다!`);
+                                logs.push(`💀 [${p.name}]이(가) 자기장에 탈락했습니다!`);
                             }
                         }
                     });
                 }
+            }
+
+            if (isOfflineMode || !db) {
+                localRoomState.turn = currentTurn + 1;
+                localRoomState.restrictedZones = restrictedZones;
+                return;
             }
 
             const roomRef = getRoomRef();
@@ -631,6 +900,7 @@
 
         function renderLogs(logs) {
             const container = document.getElementById("event-log-container");
+            if (!container) return;
             container.innerHTML = "";
             logs.slice(-30).forEach(log => {
                 const item = document.createElement("div");
@@ -641,25 +911,24 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // 모달 제어
         window.openInventoryModal = function() {
-            document.getElementById("modal-inventory").classList.remove("hidden");
+            document.getElementById("modal-inventory")?.classList.remove("hidden");
             renderInventory();
         };
 
         window.openCraftingModal = function() {
-            document.getElementById("modal-crafting").classList.remove("hidden");
+            document.getElementById("modal-crafting")?.classList.remove("hidden");
             renderCrafting();
         };
 
         window.closeModal = function(id) {
-            document.getElementById(id).classList.add("hidden");
+            document.getElementById(id)?.classList.add("hidden");
         };
 
-        // 인벤토리 렌더링
         function renderInventory() {
             const equippedList = document.getElementById("inventory-equipped-list");
             const itemsList = document.getElementById("inventory-items-list");
+            if (!equippedList || !itemsList) return;
 
             let weaponText = "맨손";
             if (player.equippedWeapon) {
@@ -668,11 +937,11 @@
             }
 
             equippedList.innerHTML = `
-                <div class="bg-slate-950 p-2 rounded border border-slate-800 text-xs flex justify-between">
+                <div class="bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs flex justify-between">
                     <span class="text-slate-400">무기:</span>
                     <span class="font-bold text-amber-400">${weaponText}</span>
                 </div>
-                <div class="bg-slate-950 p-2 rounded border border-slate-800 text-xs flex justify-between">
+                <div class="bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs flex justify-between">
                     <span class="text-slate-400">방어구:</span>
                     <span class="font-bold text-cyan-400">${player.equippedArmor || "없음"}</span>
                 </div>
@@ -693,13 +962,13 @@
 
                 const itemData = ITEMS_DATABASE[code] || { name: code, type: "material", desc: "" };
                 const div = document.createElement("div");
-                div.className = "bg-slate-950 p-2 rounded border border-slate-800 flex justify-between items-center text-xs";
+                div.className = "bg-slate-950 p-2 rounded-xl border border-slate-800 flex justify-between items-center text-xs";
                 
                 let actionBtn = "";
                 if (itemData.type === 'consumable') {
-                    actionBtn = `<button onclick="useOrEquipItem('${code}')" class="bg-emerald-800 hover:bg-emerald-700 px-2.5 py-1 rounded text-[10px] font-bold text-white transition">사용</button>`;
+                    actionBtn = `<button onclick="useOrEquipItem('${code}')" class="bg-emerald-800 hover:bg-emerald-700 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white transition">사용</button>`;
                 } else if (itemData.type === 'weapon') {
-                    actionBtn = `<button onclick="useOrEquipItem('${code}')" class="bg-amber-800 hover:bg-amber-700 px-2.5 py-1 rounded text-[10px] font-bold text-white transition">장착</button>`;
+                    actionBtn = `<button onclick="useOrEquipItem('${code}')" class="bg-amber-800 hover:bg-amber-700 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white transition">장착</button>`;
                 }
 
                 div.innerHTML = `
@@ -714,51 +983,50 @@
             });
         }
 
-        // 아이템 사용/장착 처리 (수량 0 체크 및 힐/무기 적용)
         window.useOrEquipItem = async function(itemCode) {
             if (!player.isAlive) return;
 
             const items = player.inventory?.items || {};
             if (!items[itemCode] || items[itemCode] <= 0) {
-                alert("아이템 수량이 부족하여 사용할 수 없습니다.");
+                window.showAlert("아이템 수량이 부족합니다.");
                 return;
             }
 
             const itemData = ITEMS_DATABASE[itemCode];
             if (!itemData) return;
 
-            const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
-
             if (itemData.type === "consumable" && itemData.effect === "heal") {
-                // 힐템 사용: 수량 차감 및 HP 회복
                 player.hp = Math.min(player.maxHp, player.hp + itemData.value);
                 items[itemCode] -= 1;
                 if (items[itemCode] <= 0) delete items[itemCode];
-
-                await update(playerRef, {
-                    hp: player.hp,
-                    "inventory/items": items
-                });
-                renderInventory();
             } else if (itemData.type === "weapon") {
-                // 무기 장착
                 const currentDurability = itemData.maxDurability || 5;
                 player.equippedWeapon = {
                     itemCode: itemCode,
                     currentDurability: currentDurability
                 };
-
-                await update(playerRef, {
-                    equippedWeapon: player.equippedWeapon
-                });
-                renderInventory();
             }
+
+            if (isOfflineMode || !db) {
+                localRoomState.players[localPlayerId] = player;
+                renderInventory();
+                renderGameplayUI(localRoomState);
+                return;
+            }
+
+            const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
+            await update(playerRef, {
+                hp: player.hp,
+                equippedWeapon: player.equippedWeapon,
+                "inventory/items": items
+            });
+            renderInventory();
         };
 
-        // 제작 모달 렌더링
         function renderCrafting() {
             const matSummary = document.getElementById("crafting-materials-summary");
             const recipeList = document.getElementById("crafting-recipes-list");
+            if (!matSummary || !recipeList) return;
 
             matSummary.innerHTML = "";
             const items = player.inventory?.items || {};
@@ -795,7 +1063,7 @@
                         <div class="text-[10px] text-slate-500">필요: ${reqText.join(", ")}</div>
                     </div>
                     <button onclick="craftItem('${recipe.id}')" ${!canCraft ? 'disabled' : ''} 
-                        class="px-3 py-1.5 rounded text-[11px] font-bold transition ${
+                        class="px-3 py-1.5 rounded-lg text-[11px] font-bold transition ${
                             canCraft ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-800 text-slate-600 cursor-not-allowed'
                         }">
                         제작
@@ -805,29 +1073,31 @@
             });
         }
 
-        // 아이템 제작 처리
         window.craftItem = async function(recipeId) {
             const recipe = RECIPES.find(r => r.id === recipeId);
             if (!recipe) return;
 
             const items = player.inventory?.items || {};
 
-            // 재료 검증
             for (let reqCode in recipe.req) {
                 if ((items[reqCode] || 0) < recipe.req[reqCode]) {
-                    alert("재료가 부족합니다.");
+                    window.showAlert("재료가 부족합니다.");
                     return;
                 }
             }
 
-            // 재료 차감
             for (let reqCode in recipe.req) {
                 items[reqCode] -= recipe.req[reqCode];
                 if (items[reqCode] <= 0) delete items[reqCode];
             }
 
-            // 결과물 추가
             items[recipe.result] = (items[recipe.result] || 0) + 1;
+
+            if (isOfflineMode || !db) {
+                localRoomState.players[localPlayerId].inventory.items = items;
+                renderCrafting();
+                return;
+            }
 
             const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
             await update(playerRef, {
@@ -836,9 +1106,6 @@
 
             renderCrafting();
         };
-
-        // 최초 실행
-        initGame();
     </script>
 </body>
 </html>
