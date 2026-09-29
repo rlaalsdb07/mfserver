@@ -173,7 +173,7 @@
             <!-- Join Code Input (If Joining) -->
             <div id="join-code-container" class="hidden">
                 <label class="block text-xs font-bold text-slate-300 mb-1">방 코드 (4자리)</label>
-                <input type="text" id="input-room-code" uppercase placeholder="예: ABCD" maxlength="4"
+                <input type="text" id="input-room-code" placeholder="예: ABCD" maxlength="4"
                        class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-center text-lg font-bold tracking-widest text-purple-400 focus:outline-none focus:border-purple-500 uppercase">
             </div>
 
@@ -377,38 +377,35 @@
         </div>
     </div>
 
-    <!-- Firebase Standard JS SDK App & Firestore -->
+    <!-- Firebase Standard JS SDK App & Realtime Database -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // Firebase Configuration
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'trpg-br-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyDummyKeyForTestingOnly",
-            authDomain: "dummy.firebaseapp.com",
-            projectId: "dummy-project",
-            storageBucket: "dummy.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef"
+        // Firebase Configuration (사용자 설정 적용 완료)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAc5sFR859k7BldgRr5w6wfMGfoL3Awi3w",
+            authDomain: "mfserver-cd778.firebaseapp.com",
+            databaseURL: "https://mfserver-cd778-default-rtdb.firebaseio.com",
+            projectId: "mfserver-cd778",
+            storageBucket: "mfserver-cd778.firebasestorage.app",
+            messagingSenderId: "39646548295",
+            appId: "1:39646548295:web:04a34338c9701bac5f3c62",
+            measurementId: "G-RLXTD2X2F9"
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        const db = getDatabase(app);
 
         // Global Game State
         const TOTAL_STAT_POINTS = 40;
         let stats = { str: 10, dex: 10, int: 10, luck: 10 };
-        let localPlayerId = null;
+        let localPlayerId = 'user_' + Math.random().toString(36).substring(2, 9);
         let roomCode = null;
         let isHost = false;
-        let userAuth = null;
-        let roomUnsubscribe = null;
 
         let player = {
-            id: null,
+            id: localPlayerId,
             name: "생존자",
             hp: 100,
             maxHp: 100,
@@ -457,17 +454,6 @@
             { name: "붕대", req: { "천": 1, "약초": 1 }, result: "붕대", type: "consumable", desc: "체력 +30 회복" }
         ];
 
-        // Initialize Firebase Authentication
-        async function authenticateUser() {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                userAuth = await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                userAuth = await signInAnonymously(auth);
-            }
-            localPlayerId = userAuth.user.uid;
-            player.id = localPlayerId;
-        }
-
         window.showCharacterCreation = function(mode) {
             const nick = document.getElementById("input-nickname").value.trim();
             if (!nick) {
@@ -514,12 +500,10 @@
         };
 
         window.confirmCharacterAndProceed = async function() {
-            await authenticateUser();
             player.maxHp = 80 + stats.str * 4;
             player.hp = player.maxHp;
 
             if (isHost) {
-                // Generate 4-letter Room Code
                 roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
                 await createRoomInFirestore();
             } else {
@@ -529,7 +513,8 @@
                     return;
                 }
                 roomCode = codeInput;
-                await joinRoomInFirestore();
+                const joined = await joinRoomInFirestore();
+                if (!joined) return;
             }
 
             document.getElementById("screen-character-creation").classList.add("hidden");
@@ -539,18 +524,18 @@
             listenToRoomUpdates();
         };
 
-        function getRoomDocRef() {
-            return doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+        function getRoomRef() {
+            return ref(db, 'rooms/' + roomCode);
         }
 
         async function createRoomInFirestore() {
-            const roomRef = getRoomDocRef();
+            const roomRef = getRoomRef();
             const initialRoomData = {
                 code: roomCode,
                 hostId: localPlayerId,
-                status: 'waiting', // waiting, playing, finished
+                status: 'waiting',
                 round: 1,
-                restrictedZones: [],
+                restrictedZones: [999],
                 players: {
                     [localPlayerId]: {
                         id: localPlayerId,
@@ -559,28 +544,29 @@
                         maxHp: player.maxHp,
                         stats: stats,
                         location: 7,
-                        equippedWeapon: null,
-                        equippedArmor: null,
+                        equippedWeapon: "",
+                        equippedArmor: "",
                         isAlive: true,
-                        selectedAction: null
+                        selectedAction: ""
                     }
                 },
                 logs: [`[방 생성] ${player.name} 님이 대기실을 생성했습니다.`]
             };
-            await setDoc(roomRef, initialRoomData);
+            await set(roomRef, initialRoomData);
         }
 
         async function joinRoomInFirestore() {
-            const roomRef = getRoomDocRef();
-            const snapshot = await getDoc(roomRef);
+            const roomRef = getRoomRef();
+            const snapshot = await get(roomRef);
 
             if (!snapshot.exists()) {
                 alert("존재하지 않는 방 코드입니다.");
-                location.reload();
-                return;
+                return false;
             }
 
-            const roomData = snapshot.data();
+            const roomData = snapshot.val();
+            if (!roomData.players) roomData.players = {};
+
             roomData.players[localPlayerId] = {
                 id: localPlayerId,
                 name: player.name,
@@ -588,23 +574,25 @@
                 maxHp: player.maxHp,
                 stats: stats,
                 location: 7,
-                equippedWeapon: null,
-                equippedArmor: null,
+                equippedWeapon: "",
+                equippedArmor: "",
                 isAlive: true,
-                selectedAction: null
+                selectedAction: ""
             };
+            
+            if (!roomData.logs) roomData.logs = [];
             roomData.logs.push(`[입장] ${player.name} 님이 방에 참가했습니다.`);
 
-            await setDoc(roomRef, roomData);
+            await set(roomRef, roomData);
+            return true;
         }
 
         function listenToRoomUpdates() {
-            const roomRef = getRoomDocRef();
-            roomUnsubscribe = onSnapshot(roomRef, (snapshot) => {
+            const roomRef = getRoomRef();
+            onValue(roomRef, (snapshot) => {
                 if (!snapshot.exists()) return;
-                const data = snapshot.data();
+                const data = snapshot.val();
 
-                // Check Game Start Transition
                 if (data.status === 'playing') {
                     document.getElementById("screen-room-waiting").classList.add("hidden");
                     document.getElementById("screen-gameplay").classList.remove("hidden");
@@ -612,9 +600,8 @@
                     document.getElementById("display-room-code").textContent = roomCode;
                 }
 
-                // Render Waiting Room Players
                 const waitingList = document.getElementById("waiting-player-list");
-                if (waitingList) {
+                if (waitingList && data.players) {
                     waitingList.innerHTML = Object.values(data.players).map(p => `
                         <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
                             <span class="text-xs font-bold text-slate-200"><i class="fa-solid fa-user text-slate-500 mr-2"></i>${p.name}</span>
@@ -628,8 +615,7 @@
                     document.getElementById("waiting-status-msg").classList.add("hidden");
                 }
 
-                // Sync Player Local Data from Room State
-                if (data.players[localPlayerId]) {
+                if (data.players && data.players[localPlayerId]) {
                     const localData = data.players[localPlayerId];
                     player.hp = localData.hp;
                     player.isAlive = localData.isAlive;
@@ -637,29 +623,33 @@
                 }
 
                 renderMultiplayerUI(data);
-            }, (error) => console.error("Room sync error:", error));
+            });
         }
 
         window.hostStartGame = async function() {
-            const roomRef = getRoomDocRef();
-            await updateDoc(roomRef, {
-                status: 'playing',
-                logs: [`[게임 시작] 전투가 시작되었습니다! 사방을 경계하십시오.`]
-            });
+            const roomRef = getRoomRef();
+            const snapshot = await get(roomRef);
+            if (!snapshot.exists()) return;
+
+            const data = snapshot.val();
+            data.status = 'playing';
+            if (!data.logs) data.logs = [];
+            data.logs.push(`[게임 시작] 전투가 시작되었습니다! 사방을 경계하십시오.`);
+
+            await set(roomRef, data);
         };
 
         window.leaveRoom = function() {
-            if (roomUnsubscribe) roomUnsubscribe();
             location.reload();
         };
 
         function renderMultiplayerUI(roomData) {
-            // Update Header Stats
-            const alivePlayers = Object.values(roomData.players).filter(p => p.isAlive);
+            const playerList = roomData.players ? Object.values(roomData.players) : [];
+            const alivePlayers = playerList.filter(p => p.isAlive);
+            
             document.getElementById("stat-survivors").textContent = alivePlayers.length;
-            document.getElementById("stat-turn").textContent = roomData.round;
+            document.getElementById("stat-turn").textContent = roomData.round || 1;
 
-            // Player Status
             document.getElementById("player-display-name").textContent = player.name;
             document.getElementById("p-str").textContent = stats.str;
             document.getElementById("p-dex").textContent = stats.dex;
@@ -670,15 +660,14 @@
             document.getElementById("hp-bar").style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
             document.getElementById("player-location-name").textContent = ZONES[player.location].name;
 
-            document.getElementById("equip-weapon").textContent = player.equippedWeapon ? `${player.equippedWeapon} (+${ITEMS_DATABASE[player.equippedWeapon].atk})` : "맨손";
-            document.getElementById("equip-armor").textContent = player.equippedArmor ? `${player.equippedArmor} (+${ITEMS_DATABASE[player.equippedArmor].def})` : "일반 의류";
+            document.getElementById("equip-weapon").textContent = player.equippedWeapon ? `${player.equippedWeapon}` : "맨손";
+            document.getElementById("equip-armor").textContent = player.equippedArmor ? `${player.equippedArmor}` : "일반 의류";
 
-            // Render Map Grid
             renderMap(roomData);
 
-            // Render Logs
             const logContainer = document.getElementById("event-log-container");
-            logContainer.innerHTML = roomData.logs.map(log => `
+            const logs = roomData.logs || [];
+            logContainer.innerHTML = logs.map(log => `
                 <div class="p-2 rounded bg-slate-950/80 border-l-2 border-red-500 text-slate-300">
                     ${log}
                 </div>
@@ -690,9 +679,12 @@
             const grid = document.getElementById("map-grid");
             grid.innerHTML = "";
 
+            const restricted = roomData.restrictedZones || [];
+            const players = roomData.players ? Object.values(roomData.players) : [];
+
             ZONES.forEach(zone => {
-                const isRestricted = roomData.restrictedZones.includes(zone.id);
-                const playersHere = Object.values(roomData.players).filter(p => p.isAlive && p.location === zone.id);
+                const isRestricted = restricted.includes(zone.id);
+                const playersHere = players.filter(p => p.isAlive && p.location === zone.id);
                 const isPlayerHere = player.location === zone.id;
 
                 let cardStyle = "border-slate-800 bg-slate-900/80";
@@ -701,7 +693,7 @@
 
                 const zoneCard = document.createElement("div");
                 zoneCard.className = `p-2.5 rounded-xl border transition relative flex flex-col justify-between ${cardStyle} min-h-[100px] cursor-pointer hover:border-slate-600`;
-                zoneCard.onclick = () => selectZoneMove(zone.id, roomData);
+                zoneCard.onclick = () => selectZoneMove(zone.id);
 
                 zoneCard.innerHTML = `
                     <div>
@@ -729,7 +721,7 @@
             });
         }
 
-        window.selectZoneMove = function(zoneId, roomData) {
+        window.selectZoneMove = function(zoneId) {
             if (zoneId === player.location) return;
             player.location = zoneId;
             selectTurnAction('move');
@@ -738,17 +730,19 @@
         window.selectTurnAction = async function(actionType) {
             if (!player.isAlive) return;
 
-            document.getElementById("action-lock-status").textContent = "행동 제출됨 - 다른 참가자 대기 중...";
+            document.getElementById("action-lock-status").textContent = "행동 제출됨 - 처리 중...";
             
-            const roomRef = getRoomDocRef();
-            const snapshot = await getDoc(roomRef);
+            const roomRef = getRoomRef();
+            const snapshot = await get(roomRef);
             if (!snapshot.exists()) return;
 
-            const roomData = snapshot.data();
+            const roomData = snapshot.val();
+            if (!roomData.players) roomData.players = {};
+            if (!roomData.logs) roomData.logs = [];
+
             roomData.players[localPlayerId].selectedAction = actionType;
             roomData.players[localPlayerId].location = player.location;
 
-            // Execute Immediate Action Effects locally
             if (actionType === 'scavenge') {
                 const dice = Math.floor(Math.random() * 20) + 1;
                 if (dice + stats.luck > 15) {
@@ -773,39 +767,14 @@
                     target.hp -= dmg;
                     if (target.hp <= 0) target.isAlive = false;
                     roomData.logs.push(`[교전] ${player.name} 님이 ${target.name} 님을 기습하여 ${dmg} 데미지를 입혔습니다!`);
+                } else {
+                    roomData.logs.push(`[교전] ${player.name} 님이 주변을 수색했으나 교전 상대가 없었습니다.`);
                 }
+            } else if (actionType === 'move') {
+                roomData.logs.push(`[이동] ${player.name} 님이 ${ZONES[player.location].name} 구역으로 이동했습니다.`);
             }
 
-            // Check if all active players submitted actions (Host resolves turn)
-            const activePlayers = Object.values(roomData.players).filter(p => p.isAlive);
-            const allSubmitted = activePlayers.every(p => p.selectedAction !== null);
-
-            if (allSubmitted && isHost) {
-                // Advance Round
-                roomData.round += 1;
-                activePlayers.forEach(p => p.selectedAction = null);
-
-                // Restricted Zone Hazard Check every 2 rounds
-                if (roomData.round % 2 === 0) {
-                    const openZones = ZONES.map(z => z.id).filter(id => !roomData.restrictedZones.includes(id));
-                    if (openZones.length > 1) {
-                        const newRestricted = openZones[Math.floor(Math.random() * openZones.length)];
-                        roomData.restrictedZones.push(newRestricted);
-                        roomData.logs.push(`🚨 [금지 구역] ${ZONES[newRestricted].name} 구역이 금지 구역으로 지정되었습니다!`);
-                    }
-                }
-
-                // Apply hazard dmg to players in restricted zones
-                Object.values(roomData.players).forEach(p => {
-                    if (p.isAlive && roomData.restrictedZones.includes(p.location)) {
-                        p.hp -= 20;
-                        if (p.hp <= 0) p.isAlive = false;
-                        roomData.logs.push(`☢️ ${p.name} 님이 금지 구역의 자기장에 노출되어 피해를 입었습니다.`);
-                    }
-                });
-            }
-
-            await setDoc(roomRef, roomData);
+            await set(roomRef, roomData);
             document.getElementById("action-lock-status").textContent = "행동 완료";
         };
 
