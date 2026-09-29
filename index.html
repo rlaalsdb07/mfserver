@@ -211,28 +211,29 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // 정적 게임 데이터베이스 정의
+        // 구역 데이터
         const ZONES = [
-            { id: 0, name: "중앙 광장", desc: "물자가 다수 존재하지만 위험한 지역입니다.", icon: "fa-monument", specialItem: "구급상자" },
-            { id: 1, name: "폐허가 된 연구소", desc: "고성능 부품과 무기를 얻을 수 있습니다.", icon: "fa-flask", specialItem: "고성능 파츠" },
-            { id: 2, name: "버려진 주택가", desc: "기본적인 생존 물자를 수집하기 좋습니다.", icon: "fa-house", specialItem: "붕대" },
-            { id: 3, name: "군사 기지", desc: "강력한 군용 무기가 숨겨져 있습니다.", icon: "fa-shield-halved", specialItem: "군용 칼" },
-            { id: 4, name: "음침한 숲", desc: "몸을 숨기기 쉽고 자연 재료가 풍부합니다.", icon: "fa-tree", specialItem: "단단한 목재" },
-            { id: 5, name: "항구 창고", desc: "철재와 금속 부품을 찾을 수 있습니다.", icon: "fa-warehouse", specialItem: "고철 조각" }
+            { id: 0, name: "중앙 광장", desc: "물자가 다수 존재하지만 위험한 지역입니다.", icon: "fa-monument", specialItem: "ITEM_MEDKIT" },
+            { id: 1, name: "폐허가 된 연구소", desc: "고성능 부품과 무기를 얻을 수 있습니다.", icon: "fa-flask", specialItem: "ITEM_PARTS" },
+            { id: 2, name: "버려진 주택가", desc: "기본적인 생존 물자를 수집하기 좋습니다.", icon: "fa-house", specialItem: "ITEM_BANDAGE" },
+            { id: 3, name: "군사 기지", desc: "강력한 군용 무기가 숨겨져 있습니다.", icon: "fa-shield-halved", specialItem: "ITEM_COMBAT_KNIFE" },
+            { id: 4, name: "음침한 숲", desc: "몸을 숨기기 쉽고 자연 재료가 풍부합니다.", icon: "fa-tree", specialItem: "ITEM_HARD_WOOD" },
+            { id: 5, name: "항구 창고", desc: "철재와 금속 부품을 찾을 수 있습니다.", icon: "fa-warehouse", specialItem: "ITEM_SCRAP_IRON" }
         ];
 
+        // 최적화된 아이템 데이터베이스 (아이템 코드 사용, 무기 내구도 5 기본 제공)
         const ITEMS_DATABASE = {
-            "구급상자": { type: "consumable", effect: "heal", value: 50, desc: "HP를 50 회복합니다." },
-            "붕대": { type: "consumable", effect: "heal", value: 20, desc: "HP를 20 회복합니다." },
-            "군용 칼": { type: "weapon", atk: 15, desc: "공격력을 상승시킵니다. (+15)" },
-            "고성능 파츠": { type: "material", desc: "제작 재료" },
-            "단단한 목재": { type: "material", desc: "제작 재료" },
-            "고철 조각": { type: "material", desc: "제작 재료" }
+            "ITEM_MEDKIT": { code: "ITEM_MEDKIT", name: "구급상자", type: "consumable", effect: "heal", value: 50, maxStackSize: 10, desc: "HP를 50 회복합니다." },
+            "ITEM_BANDAGE": { code: "ITEM_BANDAGE", name: "붕대", type: "consumable", effect: "heal", value: 20, maxStackSize: 20, desc: "HP를 20 회복합니다." },
+            "ITEM_COMBAT_KNIFE": { code: "ITEM_COMBAT_KNIFE", name: "군용 칼", type: "weapon", atk: 15, maxDurability: 5, maxStackSize: 5, desc: "공격력을 상승시킵니다. (+15, 내구도: 5)" },
+            "ITEM_PARTS": { code: "ITEM_PARTS", name: "고성능 파츠", type: "material", maxStackSize: 99, desc: "제작 재료" },
+            "ITEM_HARD_WOOD": { code: "ITEM_HARD_WOOD", name: "단단한 목재", type: "material", maxStackSize: 99, desc: "제작 재료" },
+            "ITEM_SCRAP_IRON": { code: "ITEM_SCRAP_IRON", name: "고철 조각", type: "material", maxStackSize: 99, desc: "제작 재료" }
         };
 
         const RECIPES = [
-            { name: "개량형 단검", result: "군용 칼", req: { "고철 조각": 2, "단단한 목재": 1 }, desc: "공격력 +15 무기" },
-            { name: "응급 키트", result: "구급상자", req: { "붕대": 2 }, desc: "HP 50 회복 아이템" }
+            { id: "RECIPE_KNIFE", name: "개량형 단검", result: "ITEM_COMBAT_KNIFE", req: { "ITEM_SCRAP_IRON": 2, "ITEM_HARD_WOOD": 1 }, desc: "공격력 +15 무기 (내구도 5)" },
+            { id: "RECIPE_MEDKIT", name: "응급 키트", result: "ITEM_MEDKIT", req: { "ITEM_BANDAGE": 2 }, desc: "HP 50 회복 아이템" }
         ];
 
         // 전역 플레이어 세션 상태
@@ -247,9 +248,9 @@
             maxHp: 100,
             location: 0,
             isAlive: true,
-            equippedWeapon: "맨손",
-            equippedArmor: "일반 의류",
-            inventory: { materials: {}, items: {} },
+            equippedWeapon: null, // { itemCode: "ITEM_COMBAT_KNIFE", currentDurability: 5 }
+            equippedArmor: null,
+            inventory: { items: {} }, // { "ITEM_MEDKIT": 2, "ITEM_COMBAT_KNIFE": 1 }
             selectedAction: null
         };
 
@@ -257,7 +258,6 @@
 
         const getRoomRef = () => ref(db, `rooms/${roomCode}`);
 
-        // 초기화 함수
         async function initGame() {
             const joined = await joinRoomInFirestore();
             if (!joined) {
@@ -379,7 +379,14 @@
                 const hpPercent = Math.max(0, Math.min(100, (me.hp / me.maxHp) * 100));
                 document.getElementById("hp-bar").style.width = `${hpPercent}%`;
 
-                document.getElementById("equip-weapon").textContent = me.equippedWeapon || "맨손";
+                // 무기 및 내구도 표기
+                if (me.equippedWeapon) {
+                    const wData = ITEMS_DATABASE[me.equippedWeapon.itemCode];
+                    document.getElementById("equip-weapon").textContent = `${wData?.name || "무기"} (${me.equippedWeapon.currentDurability}/${wData?.maxDurability || 5})`;
+                } else {
+                    document.getElementById("equip-weapon").textContent = "맨손";
+                }
+
                 document.getElementById("equip-armor").textContent = me.equippedArmor || "일반 의류";
 
                 if (me.stats) {
@@ -505,6 +512,7 @@
             }
         }
 
+        // 라운드 결과 로직 실행 (무기 내구도 차감 및 파괴 포함)
         async function resolveTurnLogic(roomData) {
             let players = roomData.players;
             let logs = roomData.logs || [];
@@ -519,11 +527,14 @@
 
                 if (p.selectedAction === 'scavenge') {
                     const zone = ZONES[p.location];
-                    const foundItem = zone.specialItem;
-                    p.inventory = p.inventory || { materials: {}, items: {} };
+                    const itemCode = zone.specialItem;
+                    const itemInfo = ITEMS_DATABASE[itemCode];
+
+                    p.inventory = p.inventory || { items: {} };
                     p.inventory.items = p.inventory.items || {};
-                    p.inventory.items[foundItem] = (p.inventory.items[foundItem] || 0) + 1;
-                    logs.push(`🔍 [${p.name}]이(가) ${zone.name}에서 [${foundItem}]을(를) 탐색해 획득했습니다.`);
+
+                    p.inventory.items[itemCode] = (p.inventory.items[itemCode] || 0) + 1;
+                    logs.push(`🔍 [${p.name}]이(가) ${zone.name}에서 [${itemInfo?.name || itemCode}]을(를) 탐색해 획득했습니다.`);
                 } else if (p.selectedAction === 'rest') {
                     const healAmt = 25;
                     p.hp = Math.min(p.maxHp, p.hp + healAmt);
@@ -532,12 +543,46 @@
                     const enemies = Object.values(players).filter(e => e.isAlive && e.id !== p.id && e.location === p.location);
                     if (enemies.length > 0) {
                         const target = enemies[Math.floor(Math.random() * enemies.length)];
-                        const weaponStat = ITEMS_DATABASE[p.equippedWeapon]?.atk || 5;
-                        const strBonus = Math.floor((p.stats?.str || 10) / 2);
-                        const dmg = weaponStat + strBonus;
                         
+                        let weaponAtk = 5;
+                        let weaponName = "맨손";
+
+                        // 장착 중인 무기가 있는 경우 처리
+                        if (p.equippedWeapon) {
+                            const wData = ITEMS_DATABASE[p.equippedWeapon.itemCode];
+                            weaponAtk = wData?.atk || 15;
+                            weaponName = wData?.name || "무기";
+
+                            // 내구도 1 감소
+                            p.equippedWeapon.currentDurability -= 1;
+                        }
+
+                        const strBonus = Math.floor((p.stats?.str || 10) / 2);
+                        const dmg = weaponAtk + strBonus;
+
                         target.hp -= dmg;
-                        logs.push(`⚔️ [${p.name}]이(가) [${target.name}]을(를) 공격하여 ${dmg} 데미지를 입혔습니다!`);
+                        logs.push(`⚔️ [${p.name}]이(가) [${weaponName}]으로 [${target.name}]을(를) 공격하여 ${dmg} 데미지를 입혔습니다!`);
+
+                        // 무기 내구도 소진 체크 (5회 사용 후 파괴)
+                        if (p.equippedWeapon && p.equippedWeapon.currentDurability <= 0) {
+                            logs.push(`💥 [${p.name}]의 [${weaponName}] 내구도가 0이 되어 파괴되었습니다!`);
+                            
+                            // 인벤토리 수량 차감 및 자동 교체
+                            const itemCode = p.equippedWeapon.itemCode;
+                            if (p.inventory?.items[itemCode] > 0) {
+                                p.inventory.items[itemCode] -= 1;
+                                if (p.inventory.items[itemCode] <= 0) {
+                                    delete p.inventory.items[itemCode];
+                                }
+                            }
+
+                            if (p.inventory?.items[itemCode] > 0) {
+                                p.equippedWeapon.currentDurability = ITEMS_DATABASE[itemCode].maxDurability || 5;
+                                logs.push(`🔄 [${p.name}]이(가) 소지품에서 새로운 [${weaponName}]을(를) 장착했습니다.`);
+                            } else {
+                                p.equippedWeapon = null; // 남은 무기가 없으면 맨손 상태
+                            }
+                        }
 
                         if (target.hp <= 0) {
                             target.hp = 0;
@@ -552,6 +597,7 @@
                 p.selectedAction = null;
             });
 
+            // 금지 구역 갱신 로직
             if (currentTurn % 2 === 0 && restrictedZones.length < ZONES.length - 1) {
                 let available = ZONES.map(z => z.id).filter(id => !restrictedZones.includes(id));
                 if (available.length > 0) {
@@ -595,19 +641,36 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        // 모달 제어
         window.openInventoryModal = function() {
             document.getElementById("modal-inventory").classList.remove("hidden");
             renderInventory();
         };
 
+        window.openCraftingModal = function() {
+            document.getElementById("modal-crafting").classList.remove("hidden");
+            renderCrafting();
+        };
+
+        window.closeModal = function(id) {
+            document.getElementById(id).classList.add("hidden");
+        };
+
+        // 인벤토리 렌더링
         function renderInventory() {
             const equippedList = document.getElementById("inventory-equipped-list");
             const itemsList = document.getElementById("inventory-items-list");
 
+            let weaponText = "맨손";
+            if (player.equippedWeapon) {
+                const wData = ITEMS_DATABASE[player.equippedWeapon.itemCode];
+                weaponText = `${wData?.name} (내구도: ${player.equippedWeapon.currentDurability}/${wData?.maxDurability || 5})`;
+            }
+
             equippedList.innerHTML = `
                 <div class="bg-slate-950 p-2 rounded border border-slate-800 text-xs flex justify-between">
                     <span class="text-slate-400">무기:</span>
-                    <span class="font-bold text-amber-400">${player.equippedWeapon || "없음"}</span>
+                    <span class="font-bold text-amber-400">${weaponText}</span>
                 </div>
                 <div class="bg-slate-950 p-2 rounded border border-slate-800 text-xs flex justify-between">
                     <span class="text-slate-400">방어구:</span>
@@ -624,120 +687,157 @@
                 return;
             }
 
-            itemKeys.forEach(itemName => {
-                const count = items[itemName];
+            itemKeys.forEach(code => {
+                const count = items[code];
                 if (count <= 0) return;
 
-                const itemData = ITEMS_DATABASE[itemName] || {};
+                const itemData = ITEMS_DATABASE[code] || { name: code, type: "material", desc: "" };
                 const div = document.createElement("div");
                 div.className = "bg-slate-950 p-2 rounded border border-slate-800 flex justify-between items-center text-xs";
+                
+                let actionBtn = "";
+                if (itemData.type === 'consumable') {
+                    actionBtn = `<button onclick="useOrEquipItem('${code}')" class="bg-emerald-800 hover:bg-emerald-700 px-2.5 py-1 rounded text-[10px] font-bold text-white transition">사용</button>`;
+                } else if (itemData.type === 'weapon') {
+                    actionBtn = `<button onclick="useOrEquipItem('${code}')" class="bg-amber-800 hover:bg-amber-700 px-2.5 py-1 rounded text-[10px] font-bold text-white transition">장착</button>`;
+                }
+
                 div.innerHTML = `
                     <div>
-                        <span class="font-bold text-slate-200">${itemName}</span>
+                        <span class="font-bold text-slate-200">${itemData.name}</span>
                         <span class="text-slate-500 ml-1">x${count}</span>
                         <p class="text-[10px] text-slate-400">${itemData.desc || ""}</p>
                     </div>
-                    <button onclick="useOrEquipItem('${itemName}')" class="bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-[10px] font-bold text-cyan-400 transition">
-                        ${itemData.type === 'consumable' ? '사용' : '장착'}
-                    </button>
+                    ${actionBtn}
                 `;
                 itemsList.appendChild(div);
             });
         }
 
-        window.useOrEquipItem = async function(itemName) {
-            const itemData = ITEMS_DATABASE[itemName];
-            if (!itemData) return;
+        // 아이템 사용/장착 처리 (수량 0 체크 및 힐/무기 적용)
+        window.useOrEquipItem = async function(itemCode) {
+            if (!player.isAlive) return;
 
-            if (itemData.type === 'weapon') {
-                player.equippedWeapon = itemName;
-            } else if (itemData.type === 'armor') {
-                player.equippedArmor = itemName;
-            } else if (itemData.type === 'consumable') {
-                if (itemData.effect === 'heal') {
-                    player.hp = Math.min(player.maxHp, player.hp + itemData.value);
-                }
-                player.inventory.items[itemName] -= 1;
+            const items = player.inventory?.items || {};
+            if (!items[itemCode] || items[itemCode] <= 0) {
+                alert("아이템 수량이 부족하여 사용할 수 없습니다.");
+                return;
             }
 
+            const itemData = ITEMS_DATABASE[itemCode];
+            if (!itemData) return;
+
             const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
-            await update(playerRef, {
-                hp: player.hp,
-                equippedWeapon: player.equippedWeapon,
-                equippedArmor: player.equippedArmor,
-                inventory: player.inventory
+
+            if (itemData.type === "consumable" && itemData.effect === "heal") {
+                // 힐템 사용: 수량 차감 및 HP 회복
+                player.hp = Math.min(player.maxHp, player.hp + itemData.value);
+                items[itemCode] -= 1;
+                if (items[itemCode] <= 0) delete items[itemCode];
+
+                await update(playerRef, {
+                    hp: player.hp,
+                    "inventory/items": items
+                });
+                renderInventory();
+            } else if (itemData.type === "weapon") {
+                // 무기 장착
+                const currentDurability = itemData.maxDurability || 5;
+                player.equippedWeapon = {
+                    itemCode: itemCode,
+                    currentDurability: currentDurability
+                };
+
+                await update(playerRef, {
+                    equippedWeapon: player.equippedWeapon
+                });
+                renderInventory();
+            }
+        };
+
+        // 제작 모달 렌더링
+        function renderCrafting() {
+            const matSummary = document.getElementById("crafting-materials-summary");
+            const recipeList = document.getElementById("crafting-recipes-list");
+
+            matSummary.innerHTML = "";
+            const items = player.inventory?.items || {};
+
+            Object.keys(items).forEach(code => {
+                if (items[code] > 0) {
+                    const itemData = ITEMS_DATABASE[code];
+                    const badge = document.createElement("span");
+                    badge.className = "bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-[11px] text-slate-300";
+                    badge.textContent = `${itemData?.name || code}: ${items[code]}개`;
+                    matSummary.appendChild(badge);
+                }
             });
 
-            renderInventory();
-        };
-
-        window.openCraftingModal = function() {
-            document.getElementById("modal-crafting").classList.remove("hidden");
-            renderCrafting();
-        };
-
-        function renderCrafting() {
-            const summary = document.getElementById("crafting-materials-summary");
-            const list = document.getElementById("crafting-recipes-list");
-
-            const mats = player.inventory?.materials || {};
-            summary.innerHTML = Object.keys(mats).map(m => 
-                `<span class="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-slate-300">${m}: ${mats[m]}</span>`
-            ).join("") || `<span class="text-slate-500">보유 재료 없음</span>`;
-
-            list.innerHTML = "";
+            recipeList.innerHTML = "";
             RECIPES.forEach(recipe => {
+                let canCraft = true;
+                let reqText = [];
+
+                Object.keys(recipe.req).forEach(reqCode => {
+                    const reqCount = recipe.req[reqCode];
+                    const hasCount = items[reqCode] || 0;
+                    const reqItemData = ITEMS_DATABASE[reqCode];
+                    reqText.push(`${reqItemData?.name || reqCode} ${hasCount}/${reqCount}`);
+                    if (hasCount < reqCount) canCraft = false;
+                });
+
                 const div = document.createElement("div");
                 div.className = "bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center text-xs";
-                
-                let reqText = Object.keys(recipe.req).map(r => `${r} ${recipe.req[r]}개`).join(", ");
-
                 div.innerHTML = `
                     <div>
-                        <span class="font-bold text-amber-400">${recipe.name}</span>
-                        <span class="text-[10px] text-slate-500 block">필요: ${reqText}</span>
-                        <span class="text-[10px] text-slate-400 block">${recipe.desc}</span>
+                        <div class="font-bold text-amber-400">${recipe.name}</div>
+                        <div class="text-[10px] text-slate-400 mb-1">${recipe.desc}</div>
+                        <div class="text-[10px] text-slate-500">필요: ${reqText.join(", ")}</div>
                     </div>
-                    <button onclick="craftItem('${recipe.name}')" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] transition">
+                    <button onclick="craftItem('${recipe.id}')" ${!canCraft ? 'disabled' : ''} 
+                        class="px-3 py-1.5 rounded text-[11px] font-bold transition ${
+                            canCraft ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                        }">
                         제작
                     </button>
                 `;
-                list.appendChild(div);
+                recipeList.appendChild(div);
             });
         }
 
-        window.craftItem = async function(recipeName) {
-            const recipe = RECIPES.find(r => r.name === recipeName);
+        // 아이템 제작 처리
+        window.craftItem = async function(recipeId) {
+            const recipe = RECIPES.find(r => r.id === recipeId);
             if (!recipe) return;
 
-            const mats = player.inventory?.materials || {};
-            for (let reqMat in recipe.req) {
-                if ((mats[reqMat] || 0) < recipe.req[reqMat]) {
-                    alert(`재료가 부족합니다: ${reqMat}`);
+            const items = player.inventory?.items || {};
+
+            // 재료 검증
+            for (let reqCode in recipe.req) {
+                if ((items[reqCode] || 0) < recipe.req[reqCode]) {
+                    alert("재료가 부족합니다.");
                     return;
                 }
             }
 
-            for (let reqMat in recipe.req) {
-                mats[reqMat] -= recipe.req[reqMat];
+            // 재료 차감
+            for (let reqCode in recipe.req) {
+                items[reqCode] -= recipe.req[reqCode];
+                if (items[reqCode] <= 0) delete items[reqCode];
             }
 
-            player.inventory.items = player.inventory.items || {};
-            player.inventory.items[recipe.result] = (player.inventory.items[recipe.result] || 0) + 1;
+            // 결과물 추가
+            items[recipe.result] = (items[recipe.result] || 0) + 1;
 
             const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
             await update(playerRef, {
-                inventory: player.inventory
+                "inventory/items": items
             });
 
             renderCrafting();
         };
 
-        window.closeModal = function(id) {
-            document.getElementById(id).classList.add("hidden");
-        };
-
-        // 앱 시작 실행
+        // 최초 실행
         initGame();
     </script>
 </body>
