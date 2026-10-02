@@ -82,7 +82,7 @@
                     <i class="fa-solid fa-skull text-3xl text-red-500"></i>
                 </div>
                 <h2 class="text-xl font-bold text-slate-100">최후의 1인 : TRPG 배틀로얄</h2>
-                <p class="text-xs text-slate-400 mt-1">이름을 입력하고 방에 참가하거나 싱글 플레이를 시작하세요.</p>
+                <p class="text-xs text-slate-400 mt-1">닉네임과 방 코드를 입력하여 멀티플레이에 입장하세요.</p>
             </div>
 
             <div class="space-y-4">
@@ -91,17 +91,14 @@
                     <input type="text" id="input-nickname" placeholder="닉네임 입력" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-red-500 transition">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">방 코드 (선택)</label>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">방 코드</label>
                     <input type="text" id="input-room-code" placeholder="예: ROOM123" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 uppercase tracking-widest focus:outline-none focus:border-red-500 transition">
                 </div>
             </div>
 
             <div class="space-y-2 pt-2">
-                <button onclick="handleCreateOrJoinRoom(false)" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl transition text-sm shadow-lg shadow-red-950/50 flex items-center justify-center gap-2">
+                <button onclick="handleCreateOrJoinRoom()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl transition text-sm shadow-lg shadow-red-950/50 flex items-center justify-center gap-2">
                     <i class="fa-solid fa-right-to-bracket"></i> 멀티플레이 방 입장 / 생성
-                </button>
-                <button onclick="startSinglePlayerMode()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-xl transition text-sm border border-slate-700 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-robot text-cyan-400"></i> 싱글 / AI 오프라인 테스트
                 </button>
             </div>
         </section>
@@ -111,7 +108,7 @@
             <div class="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div>
                     <h2 class="text-lg font-bold text-slate-100">대기실 참가자 목록</h2>
-                    <p class="text-xs text-slate-400">모든 생존자가 준비되면 게임을 시작합니다.</p>
+                    <p class="text-xs text-slate-400">모든 생존자가 준비되면 방장이 게임을 시작합니다.</p>
                 </div>
                 <span id="waiting-room-code-badge" class="bg-purple-950 border border-purple-800 text-purple-300 font-bold text-xs px-3 py-1 rounded-full uppercase tracking-wider">ROOM123</span>
             </div>
@@ -321,30 +318,30 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+        
+        // Firebase 설정 (제공해주신 이미지 정보 적용)
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            databaseURL: "YOUR_DATABASE_URL",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyAc5sFR859k7BldgRr5w6wfMGfol3Awi3w",
+            authDomain: "mfserver-cd778.firebaseapp.com",
+            databaseURL: "https://mfserver-cd778-default-rtdb.firebaseio.com",
+            projectId: "mfserver-cd778",
+            storageBucket: "mfserver-cd778.firebasestorage.app",
+            messagingSenderId: "39646548295",
+            appId: "1:39646548295:web:04a34338c9701bac5f3c62",
+            measurementId: "G-RLXTD2X2F9"
         };
 
         let db = null;
-        let isOfflineMode = false;
 
         try {
             if (firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.databaseURL !== "YOUR_DATABASE_URL") {
                 const app = initializeApp(firebaseConfig);
                 db = getDatabase(app);
             } else {
-                console.warn("Firebase 설정이 연결되지 않았으므로 오프라인/테스트 모드로 전환됩니다.");
-                isOfflineMode = true;
+                console.warn("Firebase 설정이 연결되지 않았습니다.");
             }
         } catch (err) {
             console.error("Firebase 초기화 오류:", err);
-            isOfflineMode = true;
         }
 
         const ZONES = [
@@ -372,7 +369,7 @@
 
         let roomCode = "ROOM123";
         let localPlayerId = "player_" + Math.random().toString(36).substring(2, 8);
-        let isHost = true;
+        let isHost = false;
 
         let player = {
             id: localPlayerId,
@@ -389,47 +386,6 @@
 
         let stats = { str: 10, dex: 10, int: 10, luck: 10 };
 
-        let localRoomState = {
-            roomCode: roomCode,
-            status: "waiting",
-            turn: 1,
-            restrictedZones: [],
-            logs: [`전장에 개설되었습니다. (로컬/싱글 모드)`],
-            players: {
-                [localPlayerId]: {
-                    ...player,
-                    stats: stats,
-                    isHost: true
-                },
-                "bot_1": {
-                    id: "bot_1",
-                    name: "AI_생존자1",
-                    hp: 100,
-                    maxHp: 100,
-                    location: 1,
-                    isAlive: true,
-                    equippedWeapon: null,
-                    equippedArmor: null,
-                    inventory: { items: {} },
-                    stats: { str: 8, dex: 8, int: 8, luck: 8 },
-                    isHost: false
-                },
-                "bot_2": {
-                    id: "bot_2",
-                    name: "AI_생존자2",
-                    hp: 100,
-                    maxHp: 100,
-                    location: 2,
-                    isAlive: true,
-                    equippedWeapon: null,
-                    equippedArmor: null,
-                    inventory: { items: {} },
-                    stats: { str: 9, dex: 9, int: 9, luck: 9 },
-                    isHost: false
-                }
-            }
-        };
-
         const getRoomRef = () => (db ? ref(db, `rooms/${roomCode}`) : null);
 
         window.showAlert = function(msg) {
@@ -441,32 +397,33 @@
             }
         };
 
-        window.handleCreateOrJoinRoom = async function(isSinglePlayer = false) {
+        window.handleCreateOrJoinRoom = async function() {
+            if (!db) {
+                window.showAlert("Firebase 연결 설정(API Key 등)을 확인해주세요.");
+                return;
+            }
+
             const nickInput = document.getElementById("input-nickname")?.value.trim();
             const roomInput = document.getElementById("input-room-code")?.value.trim();
 
-            if (nickInput) {
-                player.name = nickInput;
-                if (localRoomState.players[localPlayerId]) {
-                    localRoomState.players[localPlayerId].name = nickInput;
-                }
+            if (!nickInput) {
+                window.showAlert("닉네임을 입력해 주세요.");
+                return;
             }
 
-            if (roomInput) {
-                roomCode = roomInput.toUpperCase();
-                localRoomState.roomCode = roomCode;
+            if (!roomInput) {
+                window.showAlert("방 코드를 입력해 주세요.");
+                return;
             }
+
+            player.name = nickInput;
+            roomCode = roomInput.toUpperCase();
 
             document.getElementById("screen-lobby")?.classList.add("hidden");
             document.getElementById("screen-room-waiting")?.classList.remove("hidden");
 
             const badge = document.getElementById("waiting-room-code-badge");
             if (badge) badge.textContent = roomCode;
-
-            if (isOfflineMode || !db) {
-                renderWaitingRoom(localRoomState);
-                return;
-            }
 
             try {
                 const joined = await joinRoomInFirestore();
@@ -476,26 +433,20 @@
                 }
                 listenToRoomUpdates();
             } catch (err) {
-                console.error("Firebase 연결 실패, 오프라인 모드로 전환합니다.", err);
-                isOfflineMode = true;
-                renderWaitingRoom(localRoomState);
+                console.error("방 진입 중 오류가 발생했습니다:", err);
+                window.showAlert("방에 접속할 수 없습니다.");
             }
         };
 
-        window.startSinglePlayerMode = function() {
-            isOfflineMode = true;
-            window.handleCreateOrJoinRoom(true);
-        };
-
         async function createRoomInFirestore() {
-            if (isOfflineMode || !db) return;
+            if (!db) return;
             const roomRef = getRoomRef();
             const initialRoomData = {
                 roomCode: roomCode,
                 status: "waiting",
                 turn: 1,
                 restrictedZones: [],
-                logs: [`방 [${roomCode}]이(가) 생겼습니다.`],
+                logs: [`방 [${roomCode}]이(가) 개설되었습니다.`],
                 players: {
                     [localPlayerId]: {
                         ...player,
@@ -508,7 +459,7 @@
         }
 
         async function joinRoomInFirestore() {
-            if (isOfflineMode || !db) return false;
+            if (!db) return false;
             const roomRef = getRoomRef();
             const snapshot = await get(roomRef);
 
@@ -516,7 +467,7 @@
 
             const roomData = snapshot.val();
             if (roomData.status !== "waiting") {
-                window.showAlert("이미 진행 중인 게임입니다.");
+                window.showAlert("이미 게임이 진행 중인 방입니다.");
                 return false;
             }
 
@@ -531,16 +482,20 @@
         }
 
         function listenToRoomUpdates() {
-            if (isOfflineMode || !db) return;
+            if (!db) return;
             const roomRef = getRoomRef();
             onValue(roomRef, (snapshot) => {
                 if (!snapshot.exists()) return;
 
                 const roomData = snapshot.val();
+                if (roomData.players && roomData.players[localPlayerId]) {
+                    isHost = roomData.players[localPlayerId].isHost || false;
+                }
+
                 renderWaitingRoom(roomData);
                 renderGameplayUI(roomData);
 
-                if (roomData.status === "playing") {
+                if (roomData.status === "playing" || roomData.status === "ended") {
                     document.getElementById("screen-room-waiting")?.classList.add("hidden");
                     document.getElementById("screen-gameplay")?.classList.remove("hidden");
                     document.getElementById("game-status-bar")?.classList.remove("hidden");
@@ -582,18 +537,20 @@
         }
 
         window.hostStartGame = async function() {
-            if (!isHost) return;
+            if (!isHost || !db) return;
 
-            if (isOfflineMode || !db) {
-                localRoomState.status = "playing";
-                document.getElementById("screen-room-waiting")?.classList.add("hidden");
-                document.getElementById("screen-gameplay")?.classList.remove("hidden");
-                document.getElementById("game-status-bar")?.classList.remove("hidden");
-                renderGameplayUI(localRoomState);
+            const roomRef = getRoomRef();
+            const snapshot = await get(roomRef);
+            if (!snapshot.exists()) return;
+
+            const roomData = snapshot.val();
+            const playerCount = Object.keys(roomData.players || {}).length;
+
+            if (playerCount < 2) {
+                window.showAlert("멀티플레이를 시작하려면 최소 2명의 플레이어가 필요합니다.");
                 return;
             }
 
-            const roomRef = getRoomRef();
             await update(roomRef, { status: "playing" });
         };
 
@@ -728,13 +685,7 @@
         }
 
         async function moveZone(zoneId) {
-            if (!player.isAlive) return;
-
-            if (isOfflineMode || !db) {
-                localRoomState.players[localPlayerId].location = zoneId;
-                renderGameplayUI(localRoomState);
-                return;
-            }
+            if (!player.isAlive || !db) return;
 
             const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
             await update(playerRef, { location: zoneId });
@@ -746,20 +697,7 @@
                 return;
             }
 
-            if (isOfflineMode || !db) {
-                localRoomState.players[localPlayerId].selectedAction = actionType;
-                
-                Object.values(localRoomState.players).forEach(p => {
-                    if (p.id !== localPlayerId && p.isAlive) {
-                        const actions = ['scavenge', 'rest', 'attack'];
-                        p.selectedAction = actions[Math.floor(Math.random() * actions.length)];
-                    }
-                });
-
-                resolveTurnLogic(localRoomState);
-                renderGameplayUI(localRoomState);
-                return;
-            }
+            if (!db) return;
 
             const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
             await update(playerRef, { selectedAction: actionType });
@@ -768,13 +706,16 @@
         };
 
         async function checkAndResolveTurn() {
-            if (!isHost || isOfflineMode || !db) return;
+            if (!isHost || !db) return;
 
             const roomRef = getRoomRef();
             const snapshot = await get(roomRef);
             if (!snapshot.exists()) return;
 
             const roomData = snapshot.val();
+
+            if (roomData.status === "ended") return;
+
             const players = roomData.players || {};
             const alivePlayers = Object.values(players).filter(p => p.isAlive);
 
@@ -808,7 +749,8 @@
                     p.inventory.items[itemCode] = (p.inventory.items[itemCode] || 0) + 1;
                     logs.push(`🔍 [${p.name}]이(가) ${zone.name}에서 [${itemInfo?.name || itemCode}]을(를) 탐색해 획득했습니다.`);
                 } else if (p.selectedAction === 'rest') {
-                    const healAmt = 25;
+                    // 휴식을 통한 회복 HP를 10으로 설정
+                    const healAmt = 10;
                     p.hp = Math.min(p.maxHp, p.hp + healAmt);
                     logs.push(`💚 [${p.name}]이(가) 휴식을 취해 HP를 ${healAmt} 회복했습니다.`);
                 } else if (p.selectedAction === 'attack') {
@@ -830,7 +772,7 @@
                         const dmg = weaponAtk + strBonus;
 
                         target.hp -= dmg;
-                        logs.push(`⚔️ [${p.name}]이(가) [${weaponName}]으로 [${target.name}]에게 ${dmg} 데미지를 입혔습니다!`);
+                        logs.push(`⚔️️ [${p.name}]이(가) [${weaponName}]으로 [${target.name}]에게 ${dmg} 데미지를 입혔습니다!`);
 
                         if (p.equippedWeapon && p.equippedWeapon.currentDurability <= 0) {
                             logs.push(`💥 [${p.name}]의 [${weaponName}] 내구도가 다하여 파괴되었습니다!`);
@@ -883,10 +825,17 @@
                 }
             }
 
-            if (isOfflineMode || !db) {
-                localRoomState.turn = currentTurn + 1;
-                localRoomState.restrictedZones = restrictedZones;
-                return;
+            // 최후의 생존자 판정
+            const remainingAlive = Object.values(players).filter(p => p.isAlive);
+            let gameStatus = "playing";
+
+            if (remainingAlive.length === 1) {
+                const winner = remainingAlive[0];
+                logs.push(`\n🏆 [게임 종료] [${winner.name}]이(가) 최후의 1인으로 생존하여 승리했습니다!`);
+                gameStatus = "ended";
+            } else if (remainingAlive.length === 0) {
+                logs.push(`\n☠️ [게임 종료] 모든 생존자가 사망하였습니다.`);
+                gameStatus = "ended";
             }
 
             const roomRef = getRoomRef();
@@ -894,7 +843,8 @@
                 players: players,
                 logs: logs,
                 turn: currentTurn + 1,
-                restrictedZones: restrictedZones
+                restrictedZones: restrictedZones,
+                status: gameStatus
             });
         }
 
@@ -984,7 +934,7 @@
         }
 
         window.useOrEquipItem = async function(itemCode) {
-            if (!player.isAlive) return;
+            if (!player.isAlive || !db) return;
 
             const items = player.inventory?.items || {};
             if (!items[itemCode] || items[itemCode] <= 0) {
@@ -1005,13 +955,6 @@
                     itemCode: itemCode,
                     currentDurability: currentDurability
                 };
-            }
-
-            if (isOfflineMode || !db) {
-                localRoomState.players[localPlayerId] = player;
-                renderInventory();
-                renderGameplayUI(localRoomState);
-                return;
             }
 
             const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
@@ -1074,6 +1017,7 @@
         }
 
         window.craftItem = async function(recipeId) {
+            if (!db) return;
             const recipe = RECIPES.find(r => r.id === recipeId);
             if (!recipe) return;
 
@@ -1092,12 +1036,6 @@
             }
 
             items[recipe.result] = (items[recipe.result] || 0) + 1;
-
-            if (isOfflineMode || !db) {
-                localRoomState.players[localPlayerId].inventory.items = items;
-                renderCrafting();
-                return;
-            }
 
             const playerRef = ref(db, `rooms/${roomCode}/players/${localPlayerId}`);
             await update(playerRef, {
